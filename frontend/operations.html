@@ -43,7 +43,7 @@
 <body>
     <div class="sidebar">
         <div class="sidebar-header"><h2>UnitFlow</h2></div>
-        <ul class="sidebar-menu" id="sidebarMenu">
+        <ul class="sidebar-menu">
             <li><a href="dashboard.html">لوحة التحكم</a></li>
             <li><a href="operations.html" class="active">العمليات</a></li>
         </ul>
@@ -111,18 +111,13 @@
     <script>
     document.addEventListener('DOMContentLoaded', function () {
         if (!requireAuth('index.html')) return;
-        
-        // التحقق من صلاحيات الوصول
-        if (!checkPageAccess(['operations', 'management'], ['operations.html'])) return;
-        
         ensureAuthUI('userName');
-        updateSidebarMenu();
         loadOperationsData();
     });
     
     async function loadOperationsData() {
         const allUnits = await db.getUnits();
-        const operationsUnits = getUnitsForDepartment(allUnits, 'operations');
+        const operationsUnits = allUnits.filter(u => u.current_department === 'operations');
         
         renderUnitsInSection('ready_for_loading', operationsUnits.filter(u => u.current_section === 'ready_for_loading'));
         renderUnitsInSection('under_loading', operationsUnits.filter(u => u.current_section === 'under_loading'));
@@ -232,48 +227,7 @@
     
     function formatDate(dateString) {
         if (!dateString) return '';
-        return new Date(dateString).toLocaleString('en-US', {
-            year: 'numeric',
-            month: '2-digit',
-            day: '2-digit',
-            hour: '2-digit',
-            minute: '2-digit',
-            second: '2-digit'
-        });
-    }
-    
-    function updateSidebarMenu() {
-        const user = getLoggedUser();
-        if (!user) return;
-        
-        const sidebarMenu = document.getElementById('sidebarMenu');
-        if (!sidebarMenu) return;
-        
-        let menuItems = '<li><a href="dashboard.html">لوحة التحكم</a></li>';
-        
-        // مدير النظام يرى جميع الروابط
-        if (user.department === 'management') {
-            menuItems += `
-                <li><a href="admin.html">الإدارة</a></li>
-                <li><a href="operations.html" class="active">العمليات</a></li>
-                <li><a href="technical.html">القسم الفني</a></li>
-                <li><a href="commercial.html">القسم التجاري</a></li>
-                <li><a href="fuel.html">قسم الوقود</a></li>
-            `;
-        } else {
-            // الموظفون الآخرون يرون فقط روابط أقسامهم
-            if (user.department === 'operations') {
-                menuItems += '<li><a href="operations.html" class="active">العمليات</a></li>';
-            } else if (user.department === 'technical') {
-                menuItems += '<li><a href="technical.html">القسم الفني</a></li>';
-            } else if (user.department === 'commercial') {
-                menuItems += '<li><a href="commercial.html">القسم التجاري</a></li>';
-            } else if (user.department === 'fuel') {
-                menuItems += '<li><a href="fuel.html">قسم الوقود</a></li>';
-            }
-        }
-        
-        sidebarMenu.innerHTML = menuItems;
+        return new Date(dateString).toLocaleString('ar-SA');
     }
     </script>
 </body>
