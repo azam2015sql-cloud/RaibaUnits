@@ -1,0 +1,473 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>لوحة الإدارة - UnitFlow</title>
+    <link rel="stylesheet" href="styles.css" />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <style>
+        .admin-container { padding: 20px; max-width: 1000px; margin: 0 auto; }
+        .admin-section { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 10px rgba(0,0,0,0.08); }
+        .admin-section h2 { margin-top: 0; color: #4dabf7; border-bottom: 1px solid #eee; padding-bottom: 10px; }
+        .form-group { margin-bottom: 15px; }
+        .form-group label { display: block; margin-bottom: 5px; font-weight: bold; }
+        .form-group input, .form-group select, .form-group textarea { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 4px; font-size: 16px; box-sizing: border-box; }
+        .btn { padding: 10px 20px; border-radius: 4px; cursor: pointer; font-size: 16px; border: none; font-weight: bold; }
+        .btn-primary { background: #4dabf7; color: white; }
+        .btn-primary:hover { background: #339af0; }
+        .btn-secondary { background: #6c757d; color: white; }
+        .btn-success { background: #28a745; color: white; }
+        .btn-success:hover { background: #218838; }
+        .btn-danger { background: #dc3545; color: white; }
+        .btn-sm { padding: 5px 10px; font-size: 14px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+        table, th, td { border: 1px solid #ddd; }
+        th, td { padding: 12px; text-align: right; }
+        th { background-color: #f8f9fa; font-weight: bold; }
+        tr:nth-child(even) { background-color: #f2f2f2; }
+        .action-buttons { display: flex; gap: 5px; }
+        .report-filters { display: flex; gap: 15px; margin-bottom: 20px; flex-wrap: wrap; }
+        .report-filters .form-group { flex: 1; min-width: 200px; }
+        .report-actions { display: flex; gap: 10px; }
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); justify-content: center; align-items: center; z-index: 1000; }
+        .modal-content { background: white; padding: 20px; border-radius: 8px; width: 90%; max-width: 500px; }
+        
+        @media print {
+            body, .main-content, .admin-container { margin: 0; padding: 0; }
+            .sidebar, .header, .admin-section:not(.printable-report), .report-filters, .report-actions button:not(.print-only) { display: none; }
+            .admin-section.printable-report { box-shadow: none; border: 1px solid #ddd; }
+            table { font-size: 12px; }
+            th, td { padding: 8px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="sidebar">
+        <div class="sidebar-header"><h2>UnitFlow</h2></div>
+        <ul class="sidebar-menu" id="sidebarMenu">
+            <li><a href="dashboard.html">لوحة التحكم</a></li>
+            <li><a href="admin.html" class="active">الإدارة</a></li>
+        </ul>
+    </div>
+
+    <div class="main-content">
+        <div class="header">
+            <h1>لوحة الإدارة</h1>
+            <div class="user-info">
+                <span id="userName">مرحباً</span>
+                <button class="logout-btn" onclick="logout()">تسجيل الخروج</button>
+            </div>
+        </div>
+
+        <div class="admin-container">
+            <div class="admin-section">
+                <h2>إدارة الوحدات</h2>
+                <details>
+                    <summary style="cursor:pointer; font-weight:bold; margin-bottom:15px;">إضافة وحدة جديدة</summary>
+                    <form id="addUnitForm" style="margin-top:15px;">
+                        <div class="form-group"><label for="unitId">رقم الوحدة</label><input type="text" id="unitId" required></div>
+                        <div class="form-group"><label for="unitType">نوع الوحدة</label>
+                            <select id="unitType" required>
+                                <option value="">اختر نوع الوحدة</option>
+                                <option value="Cargo">Cargo</option><option value="Tipper">Tipper</option>
+                                <option value="Tanker">Tanker</option><option value="Silo">Silo</option>
+                                <option value="Container">Container</option>
+                            </select>
+                        </div>
+                        <button type="submit" class="btn btn-primary">إضافة الوحدة</button>
+                    </form>
+                </details>
+                <div id="unitsTableContainer"></div>
+            </div>
+
+            <div class="admin-section">
+                <h2>إدارة الموظفين</h2>
+                <details>
+                    <summary style="cursor:pointer; font-weight:bold; margin-bottom:15px;">إضافة موظف جديد</summary>
+                    <form id="addEmployeeForm" style="margin-top:15px;">
+                        <div class="form-group"><label for="empName">اسم الموظف</label><input type="text" id="empName" required></div>
+                        <div class="form-group"><label for="empUsername">اسم المستخدم</label><input type="text" id="empUsername" required></div>
+                        <div class="form-group"><label for="empPassword">كلمة المرور</label><input type="password" id="empPassword" required></div>
+                        <div class="form-group"><label for="empDepartment">القسم</label>
+                            <select id="empDepartment" required>
+                                <option value="">اختر القسم</option><option value="technical">الفني</option><option value="commercial">التجاري</option>
+                                <option value="fuel">الوقود</option><option value="operations">العمليات</option><option value="management">الإدارة</option>
+                            </select>
+                        </div>
+                        <div class="form-group"><label for="empWorkPage">صفحة العمل</label><input type="text" id="empWorkPage" required placeholder="e.g., technical.html"></div>
+                        <button type="submit" class="btn btn-primary">إضافة الموظف</button>
+                    </form>
+                </details>
+                <div id="employeesTableContainer"></div>
+            </div>
+
+            <div class="admin-section printable-report">
+                <h2>تقرير الحركات</h2>
+                <div class="report-filters">
+                    <div class="form-group"><label for="reportUnit">الوحدة</label><select id="reportUnit"><option value="">جميع الوحدات</option></select></div>
+                    <div class="form-group"><label for="reportEmployee">الموظف</label><select id="reportEmployee"><option value="">جميع الموظفين</option></select></div>
+                    <div class="form-group"><label for="reportDateFrom">من تاريخ</label><input type="date" id="reportDateFrom"></div>
+                    <div class="form-group"><label for="reportDateTo">إلى تاريخ</label><input type="date" id="reportDateTo"></div>
+                </div>
+                <div class="report-actions">
+                    <button class="btn btn-primary" onclick="generateReport()">استخراج التقرير</button>
+                    <button class="btn btn-secondary" onclick="printReport()">طباعة</button>
+                    <button class="btn btn-success" onclick="exportToExcel()">تصدير Excel</button>
+                </div>
+                <div id="reportResults"></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal" id="editUnitModal">
+        <div class="modal-content">
+            <h3 style="margin-top:0;">تعديل بيانات الوحدة</h3>
+            <input type="hidden" id="editUnitId">
+            <div class="form-group"><label for="editUnitType">نوع الوحدة</label>
+                <select id="editUnitType" required>
+                    <option value="Cargo">Cargo</option><option value="Tipper">Tipper</option><option value="Tanker">Tanker</option>
+                    <option value="Silo">Silo</option><option value="Container">Container</option>
+                </select>
+            </div>
+            <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top:20px;">
+                <button class="btn btn-secondary" onclick="hideEditUnitModal()">إلغاء</button>
+                <button class="btn btn-primary" onclick="confirmUpdateUnit()">حفظ</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal" id="editEmployeeModal">
+        <div class="modal-content">
+            <h3 style="margin-top:0;">تعديل بيانات الموظف</h3>
+            <input type="hidden" id="editEmpId">
+            <div class="form-group"><label for="editEmpName">اسم الموظف</label><input type="text" id="editEmpName" required></div>
+            <div class="form-group"><label for="editEmpUsername">اسم المستخدم</label><input type="text" id="editEmpUsername" required></div>
+            <div class="form-group"><label for="editEmpPassword">كلمة المرور (اتركه فارغاً لعدم التغيير)</label><input type="password" id="editEmpPassword"></div>
+            <div class="form-group"><label for="editEmpDepartment">القسم</label>
+                <select id="editEmpDepartment" required>
+                    <option value="technical">الفني</option><option value="commercial">التجاري</option><option value="fuel">الوقود</option>
+                    <option value="operations">العمليات</option><option value="management">الإدارة</option>
+                </select>
+            </div>
+            <div class="form-group"><label for="editEmpWorkPage">صفحة العمل</label><input type="text" id="editEmpWorkPage" required></div>
+            <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top:20px;">
+                <button class="btn btn-secondary" onclick="hideEditEmployeeModal()">إلغاء</button>
+                <button class="btn btn-primary" onclick="confirmUpdateEmployee()">حفظ</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="auth.js"></script>
+    <script src="db.js"></script>
+    <script>
+    document.addEventListener('DOMContentLoaded', () => {
+        if (!requireAuth('index.html')) return; 
+        
+        // التحقق من صلاحيات الوصول - فقط مدير النظام
+        if (!checkPageAccess(['management'], ['admin.html'])) return;
+        
+        ensureAuthUI('userName');
+        updateSidebarMenu();
+        initializeAdminPanel();
+    });
+
+    function initializeAdminPanel() {
+        loadAllData();
+        document.getElementById('addUnitForm').addEventListener('submit', addUnitHandler);
+        document.getElementById('addEmployeeForm').addEventListener('submit', addEmployeeHandler);
+    }
+
+    async function loadAllData() {
+        await Promise.all([
+            loadUnitsTable(),
+            loadEmployeesTable(),
+            loadUnitsForReport(),
+            loadEmployeesForReport()
+        ]);
+        generateReport();
+    }
+    
+    // --- Units Management ---
+    async function loadUnitsTable() {
+        const units = await db.getUnits();
+        const container = document.getElementById('unitsTableContainer');
+        let tableHtml = `<table><thead><tr>
+            <th>رقم الوحدة</th><th>النوع</th><th>القسم الحالي</th><th>الحالة الحالية</th><th>إجراءات</th>
+            </tr></thead><tbody>`;
+        
+        if (units.length === 0) {
+            tableHtml += '<tr><td colspan="5" style="text-align: center;">لا توجد وحدات.</td></tr>';
+        } else {
+            units.forEach(unit => {
+                tableHtml += `<tr>
+                    <td>${unit.id}</td><td>${unit.type}</td><td>${unit.current_department || 'غير محدد'}</td><td>${unit.current_section || 'غير محدد'}</td>
+                    <td class="action-buttons">
+                        <button class="btn btn-primary btn-sm" onclick="showEditUnitModal('${unit.id}')">تعديل</button>
+                        <button class="btn btn-danger btn-sm" onclick="deleteUnit('${unit.id}')">حذف</button>
+                    </td>
+                </tr>`;
+            });
+        }
+        container.innerHTML = tableHtml + '</tbody></table>';
+    }
+
+    async function addUnitHandler(e) {
+        e.preventDefault();
+        const unitId = document.getElementById('unitId').value.trim();
+        const unitType = document.getElementById('unitType').value;
+        if (!unitId || !unitType) { alert('يرجى تعبئة كافة الحقول.'); return; }
+        
+        const success = await db.addUnit(unitId, unitType);
+        if (success) {
+            alert('تم إضافة الوحدة بنجاح');
+            document.getElementById('addUnitForm').reset();
+            loadAllData();
+        }
+    }
+
+    async function showEditUnitModal(unitId) {
+        const units = await db.getUnits();
+        const unit = units.find(u => u.id === unitId);
+        if (unit) {
+            document.getElementById('editUnitId').value = unit.id;
+            document.getElementById('editUnitType').value = unit.type;
+            document.getElementById('editUnitModal').style.display = 'flex';
+        }
+    }
+
+    function hideEditUnitModal() { document.getElementById('editUnitModal').style.display = 'none'; }
+
+    async function confirmUpdateUnit() {
+        const unitId = document.getElementById('editUnitId').value;
+        const newType = document.getElementById('editUnitType').value;
+        
+        const success = await db.updateUnit(unitId, newType);
+        if (success) {
+            alert('تم تحديث الوحدة بنجاح');
+            hideEditUnitModal();
+            loadUnitsTable();
+        }
+    }
+
+    async function deleteUnit(unitId) {
+        if (confirm(`هل أنت متأكد من حذف الوحدة ${unitId}؟ لا يمكن التراجع عن هذا الإجراء.`)) {
+            const success = await db.deleteUnit(unitId);
+            if (success) {
+                alert('تم حذف الوحدة بنجاح');
+                loadAllData();
+            }
+        }
+    }
+
+    // --- Employees Management ---
+    async function loadEmployeesTable() {
+        const employees = await db.getEmployees();
+        const container = document.getElementById('employeesTableContainer');
+        let tableHtml = `<table><thead><tr>
+            <th>الاسم</th><th>اسم المستخدم</th><th>القسم</th><th>صفحة العمل</th><th>إجراءات</th>
+            </tr></thead><tbody>`;
+
+        if (employees.length === 0) {
+            tableHtml += '<tr><td colspan="5" style="text-align: center;">لا يوجد موظفون.</td></tr>';
+        } else {
+            employees.forEach(emp => {
+                tableHtml += `<tr>
+                    <td>${emp.name}</td><td>${emp.username}</td><td>${emp.department}</td><td>${emp.work_page}</td>
+                    <td class="action-buttons">
+                        <button class="btn btn-primary btn-sm" onclick="showEditEmployeeModal(${emp.id})">تعديل</button>
+                        ${emp.id !== 1 ? `<button class="btn btn-danger btn-sm" onclick="deleteEmployee(${emp.id})">حذف</button>` : ''}
+                    </td>
+                </tr>`;
+            });
+        }
+        container.innerHTML = tableHtml + '</tbody></table>';
+    }
+    
+    async function addEmployeeHandler(e) {
+        e.preventDefault();
+        const name = document.getElementById('empName').value.trim();
+        const username = document.getElementById('empUsername').value.trim();
+        const password = document.getElementById('empPassword').value;
+        const department = document.getElementById('empDepartment').value;
+        const workPage = document.getElementById('empWorkPage').value.trim();
+
+        if (!name || !username || !password || !department || !workPage) { alert('يرجى تعبئة كافة الحقول.'); return; }
+        
+        const success = await db.addEmployee(name, username, password, department, workPage);
+        if (success) {
+            alert('تم إضافة الموظف بنجاح');
+            document.getElementById('addEmployeeForm').reset();
+            loadAllData();
+        }
+    }
+
+    async function showEditEmployeeModal(id) {
+        const employees = await db.getEmployees();
+        const emp = employees.find(e => e.id == id);
+        if (emp) {
+            document.getElementById('editEmpId').value = emp.id;
+            document.getElementById('editEmpName').value = emp.name;
+            document.getElementById('editEmpUsername').value = emp.username;
+            document.getElementById('editEmpDepartment').value = emp.department;
+            document.getElementById('editEmpWorkPage').value = emp.work_page;
+            document.getElementById('editEmpPassword').value = '';
+            document.getElementById('editEmployeeModal').style.display = 'flex';
+        }
+    }
+
+    function hideEditEmployeeModal() { document.getElementById('editEmployeeModal').style.display = 'none'; }
+    
+    async function confirmUpdateEmployee() {
+        const id = document.getElementById('editEmpId').value;
+        const name = document.getElementById('editEmpName').value.trim();
+        const username = document.getElementById('editEmpUsername').value.trim();
+        const department = document.getElementById('editEmpDepartment').value;
+        const workPage = document.getElementById('editEmpWorkPage').value.trim();
+        const password = document.getElementById('editEmpPassword').value;
+
+        if (!name || !username || !department || !workPage) { alert('الرجاء تعبئة كل الحقول عدا كلمة المرور.'); return; }
+
+        const success = await db.updateEmployee(id, name, username, department, workPage, password);
+        if (success) {
+            alert('تم تحديث الموظف بنجاح.');
+            hideEditEmployeeModal();
+            loadEmployeesTable();
+        }
+    }
+
+    async function deleteEmployee(id) {
+        if (confirm('هل أنت متأكد من حذف هذا الموظف؟')) {
+            const success = await db.deleteEmployee(id);
+            if (success) {
+                alert('تم حذف الموظف بنجاح.');
+                loadAllData();
+            }
+        }
+    }
+    
+    // --- Reports ---
+    async function loadUnitsForReport() {
+        const units = await db.getUnits();
+        const select = document.getElementById('reportUnit');
+        select.innerHTML = '<option value="">جميع الوحدات</option>' + units.map(u => `<option value="${u.id}">${u.id}</option>`).join('');
+    }
+    
+    async function loadEmployeesForReport() {
+        const employees = await db.getEmployees();
+        const select = document.getElementById('reportEmployee');
+        select.innerHTML = '<option value="">جميع الموظفين</option>' + employees.map(e => `<option value="${e.id}">${e.name}</option>`).join('');
+    }
+    
+    async function generateReport() {
+        const unitId = document.getElementById('reportUnit').value;
+        const employeeId = document.getElementById('reportEmployee').value;
+        const dateFrom = document.getElementById('reportDateFrom').value;
+        const dateTo = document.getElementById('reportDateTo').value;
+        
+        const movements = await db.getMovements(unitId, employeeId, dateFrom, dateTo);
+        const container = document.getElementById('reportResults');
+        let tableHtml = `<table><thead><tr>
+            <th>التاريخ</th><th>الوحدة</th><th>الموظف</th><th>نوع الحركة</th><th>من</th><th>إلى</th>
+            </tr></thead><tbody>`;
+        
+        if (movements.length === 0) {
+            tableHtml += '<tr><td colspan="6" style="text-align: center;">لا توجد حركات مطابقة للبحث.</td></tr>';
+        } else {
+            movements.forEach(m => {
+                tableHtml += `<tr>
+                    <td>${new Date(m.timestamp).toLocaleString('en-US', {
+                        year: 'numeric',
+                        month: '2-digit',
+                        day: '2-digit',
+                        hour: '2-digit',
+                        minute: '2-digit',
+                        second: '2-digit'
+                    })}</td><td>${m.unit_id}</td>
+                    <td>${m.employee_name}</td><td>${m.movement_type}</td>
+                    <td>${m.from_department || ''} - ${m.from_section || ''}</td>
+                    <td>${m.to_department || ''} - ${m.to_section || ''}</td>
+                </tr>`;
+            });
+        }
+        container.innerHTML = tableHtml + '</tbody></table>';
+    }
+
+    function printReport() {
+        window.print();
+    }
+    
+    function updateSidebarMenu() {
+        const user = getLoggedUser();
+        if (!user) return;
+        
+        const sidebarMenu = document.getElementById('sidebarMenu');
+        if (!sidebarMenu) return;
+        
+        let menuItems = '<li><a href="dashboard.html">لوحة التحكم</a></li>';
+        
+        // مدير النظام يرى جميع الروابط
+        if (user.department === 'management') {
+            menuItems += `
+                <li><a href="admin.html" class="active">الإدارة</a></li>
+                <li><a href="operations.html">العمليات</a></li>
+                <li><a href="technical.html">القسم الفني</a></li>
+                <li><a href="commercial.html">القسم التجاري</a></li>
+                <li><a href="fuel.html">قسم الوقود</a></li>
+            `;
+        } else {
+            // الموظفون الآخرون يرون فقط روابط أقسامهم
+            if (user.department === 'operations') {
+                menuItems += '<li><a href="operations.html">العمليات</a></li>';
+            } else if (user.department === 'technical') {
+                menuItems += '<li><a href="technical.html">القسم الفني</a></li>';
+            } else if (user.department === 'commercial') {
+                menuItems += '<li><a href="commercial.html">القسم التجاري</a></li>';
+            } else if (user.department === 'fuel') {
+                menuItems += '<li><a href="fuel.html">قسم الوقود</a></li>';
+            }
+        }
+        
+        sidebarMenu.innerHTML = menuItems;
+    }
+    
+    // دالة تصدير التقرير إلى Excel
+    function exportToExcel() {
+        const reportResults = document.getElementById('reportResults');
+        const table = reportResults.querySelector('table');
+        
+        if (!table) {
+            alert('لا يوجد تقرير لعرضه. يرجى استخراج التقرير أولاً.');
+            return;
+        }
+        
+        try {
+            // إنشاء مصنف Excel
+            const wb = XLSX.utils.book_new();
+            
+            // تحويل الجدول إلى ورقة عمل
+            const ws = XLSX.utils.table_to_sheet(table);
+            
+            // إضافة ورقة العمل إلى المصنف
+            XLSX.utils.book_append_sheet(wb, ws, 'تقرير الحركات');
+            
+            // إنشاء اسم الملف مع التاريخ والوقت
+            const now = new Date();
+            const dateStr = now.toLocaleDateString('ar-SA').replace(/\//g, '-');
+            const timeStr = now.toLocaleTimeString('ar-SA', { hour12: false }).replace(/:/g, '-');
+            const fileName = `تقرير_الحركات_${dateStr}_${timeStr}.xlsx`;
+            
+            // تحميل الملف
+            XLSX.writeFile(wb, fileName);
+            
+            // رسالة نجاح
+            alert('تم تصدير التقرير إلى Excel بنجاح!');
+            
+        } catch (error) {
+            console.error('خطأ في تصدير Excel:', error);
+            alert('حدث خطأ في تصدير التقرير إلى Excel. يرجى المحاولة مرة أخرى.');
+        }
+    }
+    </script>
+</body>
+</html>

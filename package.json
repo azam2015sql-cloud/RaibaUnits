@@ -1,0 +1,36 @@
+{
+  "name": "unitflow-system",
+  "version": "1.0.0",
+  "description": "نظام إدارة الوحدات والحركات - UnitFlow Management System",
+  "main": "backend/server.js",
+  "scripts": {
+    "start": "node backend/server.js",
+    "dev": "nodemon backend/server.js",
+    "build": "echo 'Building for production...'",
+    "deploy": "echo 'Deploying to hosting...'"
+  },
+  "keywords": [
+    "unitflow",
+    "management",
+    "system",
+    "arabic",
+    "units",
+    "movements"
+  ],
+  "author": "UnitFlow Team",
+  "license": "MIT",
+  "dependencies": {
+    "express": "^4.18.2",
+    "mysql2": "^3.6.0",
+    "bcrypt": "^5.1.1",
+    "cors": "^2.8.5",
+    "dotenv": "^16.3.1"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.1"
+  },
+  "engines": {
+    "node": ">=16.0.0",
+    "npm": ">=8.0.0"
+  }
+}

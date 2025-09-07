@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>إدارة العمليات - UnitFlow</title>
+    <link rel="stylesheet" href="styles.css" />
+    <script src="db.js" defer></script>
+    <script src="auth.js" defer></script>
+    <style>
+        .operations-container { padding: 20px; }
+        .operations-actions { display: flex; gap: 1rem; margin: 1.5rem 0; flex-wrap: wrap; }
+        .action-btn { padding: 0.75rem 1.5rem; background: #4dabf7; color: white; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; transition: all 0.3s ease; }
+        .action-btn:hover { background: #339af0; transform: translateY(-2px); }
+        .sections-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 1.5rem; margin-top: 1.5rem; }
+        .section-card { background: white; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.08); overflow: hidden; }
+        .shared-section { border: 2px dashed #4dabf7; background-color: #f0f8ff; }
+        .section-header { padding: 1rem; background: #4dabf7; color: white; font-weight: bold; }
+        .section-content { padding: 1rem; min-height: 200px; max-height: 300px; overflow-y: auto; }
+        .unit-item { background: #f8f9fa; border-radius: 5px; padding: 0.75rem; margin-bottom: 0.5rem; cursor: pointer; transition: all 0.2s ease; border-left: 4px solid #4dabf7; }
+        .unit-item:hover { background: #e9ecef; transform: translateX(-5px); }
+        .unit-id { font-weight: bold; margin-bottom: 0.25rem; }
+        .unit-details { display: flex; justify-content: space-between; font-size: 0.8rem; color: #6c757d; }
+        .unit-actions { display: flex; gap: 0.5rem; margin-top: 0.5rem; }
+        .unit-btn { padding: 0.25rem 0.5rem; border: none; border-radius: 3px; cursor: pointer; font-size: 0.7rem; }
+        .btn-move { background: #4dabf7; color: white; }
+        .btn-details { background: #6c757d; color: white; }
+        .btn-transfer { background: #20c997; color: white; }
+        .empty-section { text-align: center; padding: 2rem; color: #6c757d; font-style: italic; }
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); justify-content: center; align-items: center; z-index: 1000; }
+        .modal-content { background: white; border-radius: 8px; width: 90%; max-width: 500px; overflow: hidden; }
+        .modal-header { padding: 1rem; background: #4dabf7; color: white; font-weight: bold; }
+        .modal-body { padding: 1.5rem; }
+        .modal-footer { padding: 1rem; background: #f8f9fa; display: flex; justify-content: flex-end; gap: 1rem; }
+        .form-group { margin-bottom: 1rem; }
+        .form-group label { display: block; margin-bottom: 0.5rem; font-weight: bold; }
+        .form-group input, .form-group select { width: 100%; padding: 0.5rem; border: 1px solid #ced4da; border-radius: 4px; }
+        .btn { padding: 0.5rem 1rem; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; }
+        .btn-primary { background: #4dabf7; color: white; }
+        .btn-secondary { background: #6c757d; color: white; }
+    </style>
+</head>
+<body>
+    <div class="sidebar">
+        <div class="sidebar-header"><h2>UnitFlow</h2></div>
+        <ul class="sidebar-menu" id="sidebarMenu">
+            <li><a href="dashboard.html">لوحة التحكم</a></li>
+            <li><a href="operations.html" class="active">العمليات</a></li>
+        </ul>
+    </div>
+
+    <div class="main-content">
+        <div class="header"><h1>إدارة العمليات</h1><div class="user-info"><span id="userName">مرحباً</span><button class="logout-btn" onclick="logout()">تسجيل الخروج</button></div></div>
+        <p>متابعة حالة الوحدات وحركاتها في نظام العمليات.</p>
+
+        <div class="operations-actions">
+            <button class="action-btn" onclick="loadOperationsData()">تحديث البيانات</button>
+        </div>
+
+        <div class="sections-grid">
+            <div class="section-card"><div class="section-header">جاهز للتحميل</div><div class="section-content" id="ready_for_loading"></div></div>
+            <div class="section-card"><div class="section-header">قيد التحميل</div><div class="section-content" id="under_loading"></div></div>
+            <div class="section-card"><div class="section-header">في الطريق (محمل)</div><div class="section-content" id="in_transit_loaded"></div></div>
+            <div class="section-card"><div class="section-header">قيد التفريغ</div><div class="section-content" id="under_unloading"></div></div>
+            <div class="section-card"><div class="section-header">في الطريق (فارغ)</div><div class="section-content" id="in_transit_empty"></div></div>
+            <div class="section-card"><div class="section-header">تم التسليم</div><div class="section-content" id="delivered"></div></div>
+            <div class="section-card shared-section"><div class="section-header">وحدات بالصيانة</div><div class="section-content" id="shared_awaiting_maintenance"></div></div>
+            <div class="section-card shared-section"><div class="section-header">وحدات بقسم المستندات</div><div class="section-content" id="shared_awaiting_documents"></div></div>
+            <div class="section-card shared-section"><div class="section-header">وحدات بقسم الوقود</div><div class="section-content" id="shared_awaiting_refuel"></div></div>
+        </div>
+    </div>
+
+    <div class="modal" id="moveUnitModal">
+        <div class="modal-content">
+            <div class="modal-header"><h3>نقل الوحدة داخل العمليات</h3></div>
+            <div class="modal-body">
+                <div class="form-group"><label for="moveUnitId">رقم الوحدة:</label><input type="text" id="moveUnitId" readonly></div>
+                <div class="form-group"><label for="moveTargetSection">الحالة الهدف:</label>
+                    <select id="moveTargetSection">
+                        <option value="ready_for_loading">جاهز للتحميل</option>
+                        <option value="under_loading">قيد التحميل</option>
+                        <option value="in_transit_loaded">في الطريق (محمل)</option>
+                        <option value="under_unloading">قيد التفريغ</option>
+                        <option value="in_transit_empty">في الطريق (فارغ)</option>
+                        <option value="delivered">تم التسليم</option>
+                    </select>
+                </div>
+            </div>
+            <div class="modal-footer"><button class="btn btn-secondary" onclick="hideMoveModal()">إلغاء</button><button class="btn btn-primary" onclick="confirmMove()">تأكيد النقل</button></div>
+        </div>
+    </div>
+
+    <div class="modal" id="transferUnitModal">
+        <div class="modal-content">
+            <div class="modal-header"><h3>تحويل الوحدة إلى قسم آخر</h3></div>
+            <div class="modal-body">
+                <div class="form-group"><label for="transferUnitId">رقم الوحدة:</label><input type="text" id="transferUnitId" readonly></div>
+                <div class="form-group"><label for="transferTargetDepartment">القسم الهدف:</label>
+                    <select id="transferTargetDepartment">
+                        <option value="technical">القسم الفني (للصيانة)</option>
+                        <option value="commercial">القسم التجاري (للمستندات)</option>
+                        <option value="fuel">قسم الوقود (للتزويد)</option>
+                    </select>
+                </div>
+                <div class="form-group"><label for="transferReason">سبب التحويل (اختياري):</label><input type="text" id="transferReason"></div>
+            </div>
+            <div class="modal-footer"><button class="btn btn-secondary" onclick="hideTransferModal()">إلغاء</button><button class="btn btn-primary" onclick="confirmTransfer()">تأكيد التحويل</button></div>
+        </div>
+    </div>
+
+    <script>
+    document.addEventListener('DOMContentLoaded', function () {
+        if (!requireAuth('index.html')) return;
+        
+        // التحقق من صلاحيات الوصول
+        if (!checkPageAccess(['operations', 'management'], ['operations.html'])) return;
+        
+        ensureAuthUI('userName');
+        updateSidebarMenu();
+        loadOperationsData();
+    });
+    
+    async function loadOperationsData() {
+        const allUnits = await db.getUnits();
+        const operationsUnits = getUnitsForDepartment(allUnits, 'operations');
+        
+        renderUnitsInSection('ready_for_loading', operationsUnits.filter(u => u.current_section === 'ready_for_loading'));
+        renderUnitsInSection('under_loading', operationsUnits.filter(u => u.current_section === 'under_loading'));
+        renderUnitsInSection('in_transit_loaded', operationsUnits.filter(u => u.current_section === 'in_transit_loaded'));
+        renderUnitsInSection('under_unloading', operationsUnits.filter(u => u.current_section === 'under_unloading'));
+        renderUnitsInSection('in_transit_empty', operationsUnits.filter(u => u.current_section === 'in_transit_empty'));
+        renderUnitsInSection('delivered', operationsUnits.filter(u => u.current_section === 'delivered'));
+        
+        renderSharedUnits('shared_awaiting_maintenance', allUnits.filter(u => u.current_department === 'technical'));
+        renderSharedUnits('shared_awaiting_documents', allUnits.filter(u => u.current_department === 'commercial'));
+        renderSharedUnits('shared_awaiting_refuel', allUnits.filter(u => u.current_department === 'fuel'));
+    }
+    
+    function renderUnitsInSection(sectionId, units) {
+        const sectionElement = document.getElementById(sectionId);
+        sectionElement.innerHTML = units.length === 0 ? '<div class="empty-section">لا توجد وحدات</div>' : '';
+        units.forEach(unit => {
+            sectionElement.innerHTML += `
+                <div class="unit-item">
+                    <div class="unit-id">${unit.id}</div>
+                    <div class="unit-details"><span>${unit.type}</span><span>${formatDate(unit.last_movement_time)}</span></div>
+                    <div class="unit-actions">
+                        <button class="unit-btn btn-move" onclick="showMoveModal('${unit.id}')">نقل</button>
+                        <button class="unit-btn btn-transfer" onclick="showTransferModal('${unit.id}')">تحويل</button>
+                        <button class="unit-btn btn-details" onclick="showUnitDetails('${unit.id}')">تفاصيل</button>
+                    </div>
+                </div>`;
+        });
+    }
+
+    function renderSharedUnits(sectionId, units) {
+        const sectionElement = document.getElementById(sectionId);
+        sectionElement.innerHTML = units.length === 0 ? '<div class="empty-section">لا توجد وحدات</div>' : '';
+        units.forEach(unit => {
+            sectionElement.innerHTML += `
+                <div class="unit-item">
+                    <div class="unit-id">${unit.id}</div>
+                    <div class="unit-details"><span>${unit.type}</span><span>${unit.current_section}</span></div>
+                </div>`;
+        });
+    }
+    
+    function showMoveModal(unitId) {
+        document.getElementById('moveUnitId').value = unitId;
+        document.getElementById('moveUnitModal').style.display = 'flex';
+    }
+    
+    function hideMoveModal() {
+        document.getElementById('moveUnitModal').style.display = 'none';
+    }
+    
+    function showTransferModal(unitId) {
+        document.getElementById('transferUnitId').value = unitId;
+        document.getElementById('transferUnitModal').style.display = 'flex';
+    }
+    
+    function hideTransferModal() {
+        document.getElementById('transferUnitModal').style.display = 'none';
+    }
+    
+    async function confirmMove() {
+        const unitId = document.getElementById('moveUnitId').value;
+        const targetSection = document.getElementById('moveTargetSection').value;
+        const user = getLoggedUser();
+        if (!user) return;
+        
+        const success = await db.moveUnit(unitId, 'operations', targetSection, user.id, 'نقل داخل العمليات');
+        if (success) {
+            hideMoveModal();
+            loadOperationsData();
+        }
+    }
+    
+    async function confirmTransfer() {
+        const unitId = document.getElementById('transferUnitId').value;
+        const targetDepartment = document.getElementById('transferTargetDepartment').value;
+        const reason = document.getElementById('transferReason').value;
+        const user = getLoggedUser();
+        if (!user) return;
+        
+        let targetSection, movementType;
+        if (targetDepartment === 'technical') {
+            targetSection = 'awaiting_maintenance';
+            movementType = 'تحويل إلى الصيانة';
+        } else if (targetDepartment === 'commercial') {
+            targetSection = 'awaiting_documents';
+            movementType = 'تحويل إلى المستندات';
+        } else if (targetDepartment === 'fuel') {
+            targetSection = 'awaiting_refuel';
+            movementType = 'تحويل إلى الوقود';
+        }
+        
+        const success = await db.moveUnit(unitId, targetDepartment, targetSection, user.id, movementType, reason);
+        if (success) {
+            hideTransferModal();
+            loadOperationsData();
+        }
+    }
+    
+    async function showUnitDetails(unitId) {
+        const units = await db.getUnits();
+        const unit = units.find(u => u.id === unitId);
+        if (unit) {
+            alert(`تفاصيل الوحدة:\n\nرقم الوحدة: ${unit.id}\nالنوع: ${unit.type}\nالقسم: ${unit.current_department}\nالحالة: ${unit.current_section}\nآخر تحديث: ${formatDate(unit.last_movement_time)}`);
+        }
+    }
+    
+    function formatDate(dateString) {
+        if (!dateString) return '';
+        return new Date(dateString).toLocaleString('en-US', {
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit'
+        });
+    }
+    
+    function updateSidebarMenu() {
+        const user = getLoggedUser();
+        if (!user) return;
+        
+        const sidebarMenu = document.getElementById('sidebarMenu');
+        if (!sidebarMenu) return;
+        
+        let menuItems = '<li><a href="dashboard.html">لوحة التحكم</a></li>';
+        
+        // مدير النظام يرى جميع الروابط
+        if (user.department === 'management') {
+            menuItems += `
+                <li><a href="admin.html">الإدارة</a></li>
+                <li><a href="operations.html" class="active">العمليات</a></li>
+                <li><a href="technical.html">القسم الفني</a></li>
+                <li><a href="commercial.html">القسم التجاري</a></li>
+                <li><a href="fuel.html">قسم الوقود</a></li>
+            `;
+        } else {
+            // الموظفون الآخرون يرون فقط روابط أقسامهم
+            if (user.department === 'operations') {
+                menuItems += '<li><a href="operations.html" class="active">العمليات</a></li>';
+            } else if (user.department === 'technical') {
+                menuItems += '<li><a href="technical.html">القسم الفني</a></li>';
+            } else if (user.department === 'commercial') {
+                menuItems += '<li><a href="commercial.html">القسم التجاري</a></li>';
+            } else if (user.department === 'fuel') {
+                menuItems += '<li><a href="fuel.html">قسم الوقود</a></li>';
+            }
+        }
+        
+        sidebarMenu.innerHTML = menuItems;
+    }
+    </script>
+</body>
+</html>

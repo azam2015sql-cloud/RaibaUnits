@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>القسم التجاري - UnitFlow</title>
+    <link rel="stylesheet" href="styles.css" />
+    <script src="db.js" defer></script>
+    <script src="auth.js" defer></script>
+    <style>
+        .commercial-container { padding: 20px; }
+        .commercial-actions { display: flex; gap: 1rem; margin: 1.5rem 0; flex-wrap: wrap; }
+        .action-btn { padding: 0.75rem 1.5rem; background: #6f42c1; color: white; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; transition: all 0.3s ease; }
+        .action-btn:hover { background: #5e36a9; transform: translateY(-2px); }
+        .subsections-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 1.5rem; margin-top: 1.5rem; }
+        .subsection { background: white; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.08); overflow: hidden; }
+        .subsection-header { padding: 1rem; background: #6f42c1; color: white; font-weight: bold; display: flex; justify-content: space-between; align-items: center; }
+        .subsection-header span { background: rgba(255,255,255,0.2); padding: 2px 8px; border-radius: 10px; font-size: 0.9em; }
+        .subsection-content { padding: 1rem; min-height: 200px; max-height: 300px; overflow-y: auto; }
+        .unit-card { background: #f8f9fa; border-radius: 5px; padding: 0.75rem; margin-bottom: 0.5rem; cursor: pointer; transition: all 0.2s ease; border-left: 4px solid #6f42c1; }
+        .unit-card:hover { background: #e9ecef; transform: translateX(-5px); }
+        .empty-subsection { text-align: center; padding: 2rem; color: #6c757d; font-style: italic; }
+        .unit-id, .unit-details, .unit-actions { margin: 0.25rem 0; }
+        .unit-btn { padding: 0.25rem 0.5rem; border: none; border-radius: 3px; cursor: pointer; font-size: 0.7rem; }
+        .btn-process { background: #6f42c1; color: white; flex: 1; }
+        .btn-details { background: #6c757d; color: white; }
+        .btn-transfer { background: #4dabf7; color: white; }
+    </style>
+</head>
+<body>
+    <div class="sidebar">
+        <div class="sidebar-header"><h2>UnitFlow</h2></div>
+        <ul class="sidebar-menu" id="sidebarMenu">
+            <li><a href="dashboard.html">لوحة التحكم</a></li>
+            <li><a href="commercial.html" class="active">التجاري</a></li>
+        </ul>
+    </div>
+
+    <div class="main-content">
+        <div class="header"><h1>القسم التجاري</h1><div class="user-info"><span id="userName">مرحباً</span><button class="logout-btn" onclick="logout()">تسجيل الخروج</button></div></div>
+        <p>إدارة المستندات والأوراق التجارية للوحدات.</p>
+
+        <div class="commercial-actions">
+            <button class="action-btn" onclick="loadCommercialData()">تحديث البيانات</button>
+        </div>
+
+        <div class="subsections-grid">
+            <div class="subsection">
+                <div class="subsection-header">في انتظار المستندات <span id="awaiting_documents_count">0</span></div>
+                <div class="subsection-content" id="awaiting_documents"></div>
+            </div>
+            <div class="subsection">
+                <div class="subsection-header">قيد المعالجة <span id="document_processing_count">0</span></div>
+                <div class="subsection-content" id="document_processing"></div>
+            </div>
+            <div class="subsection">
+                <div class="subsection-header">اكتمال المستندات (جاهزة للعودة) <span id="document_completed_count">0</span></div>
+                <div class="subsection-content" id="document_completed"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+    document.addEventListener('DOMContentLoaded', function () {
+        if (!requireAuth('index.html')) return;
+        
+        // التحقق من صلاحيات الوصول
+        if (!checkPageAccess(['commercial', 'management'], ['commercial.html'])) return;
+        
+        ensureAuthUI('userName');
+        updateSidebarMenu();
+        loadCommercialData();
+    });
+    
+    async function loadCommercialData() {
+        const units = await db.getUnits();
+        const commercialUnits = getUnitsForDepartment(units, 'commercial');
+        
+        renderUnitsInSection('awaiting_documents', commercialUnits.filter(u => u.current_section === 'awaiting_documents'));
+        renderUnitsInSection('document_processing', commercialUnits.filter(u => u.current_section === 'document_processing'));
+        renderUnitsInSection('document_completed', commercialUnits.filter(u => u.current_section === 'document_completed'), true);
+    }
+    
+    function renderUnitsInSection(sectionId, units, isFinalSection = false) {
+        const sectionElement = document.getElementById(sectionId);
+        const countElement = document.getElementById(`${sectionId}_count`);
+        sectionElement.innerHTML = '';
+        if(countElement) countElement.textContent = units.length;
+
+        if (units.length === 0) {
+            sectionElement.innerHTML = '<div class="empty-subsection">لا توجد وحدات في هذا القسم</div>';
+            return;
+        }
+        
+        units.forEach(unit => {
+            const unitCard = document.createElement('div');
+            unitCard.className = 'unit-card';
+            
+            let actionsHtml = '';
+            if (isFinalSection) {
+                actionsHtml = `<button class="unit-btn btn-transfer" onclick="returnToOperations('${unit.id}')">عودة إلى العمليات</button>`;
+            } else if (unit.current_section === 'awaiting_documents') {
+                actionsHtml = `<button class="unit-btn btn-process" onclick="processUnit('${unit.id}', 'document_processing')">بدء المعالجة</button>`;
+            } else if (unit.current_section === 'document_processing') {
+                actionsHtml = `<button class="unit-btn btn-process" onclick="processUnit('${unit.id}', 'document_completed')">إنهاء المعالجة</button>`;
+            }
+
+            unitCard.innerHTML = `
+                <div class="unit-id">${unit.id}</div>
+                <div class="unit-details">
+                    <span>${unit.type}</span>
+                    <span>${formatDate(unit.last_movement_time)}</span>
+                </div>
+                <div class="unit-actions">
+                    ${actionsHtml}
+                    <button class="unit-btn btn-details" onclick="showUnitDetails('${unit.id}')">تفاصيل</button>
+                </div>
+            `;
+            
+            sectionElement.appendChild(unitCard);
+        });
+    }
+
+    async function processUnit(unitId, targetSection) {
+        const user = getLoggedUser();
+        if (!user) return;
+        
+        const success = await db.moveUnit(unitId, 'commercial', targetSection, user.id, 'معالجة المستندات');
+        if (success) {
+            loadCommercialData();
+        }
+    }
+    
+    async function returnToOperations(unitId) {
+        const user = getLoggedUser();
+        if (!user) return;
+        
+        if (confirm('هل تريد إرجاع هذه الوحدة إلى قسم العمليات؟')) {
+            const success = await db.moveUnit(unitId, 'operations', 'ready_for_loading', user.id, 'عودة إلى العمليات');
+            if (success) {
+                alert('تم إرجاع الوحدة إلى العمليات بنجاح');
+                loadCommercialData();
+            }
+        }
+    }
+    
+    async function showUnitDetails(unitId) {
+        const units = await db.getUnits();
+        const unit = units.find(u => u.id === unitId);
+        if (unit) {
+            alert(`تفاصيل الوحدة:\n\nرقم الوحدة: ${unit.id}\nالنوع: ${unit.type}\nالقسم: ${unit.current_department}\nالحالة: ${unit.current_section}\nآخر تحديث: ${formatDate(unit.last_movement_time)}`);
+        }
+    }
+    
+    function formatDate(dateString) {
+        if (!dateString) return '';
+        return new Date(dateString).toLocaleString('en-US', {
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit'
+        });
+    }
+    
+    function updateSidebarMenu() {
+        const user = getLoggedUser();
+        if (!user) return;
+        
+        const sidebarMenu = document.getElementById('sidebarMenu');
+        if (!sidebarMenu) return;
+        
+        let menuItems = '<li><a href="dashboard.html">لوحة التحكم</a></li>';
+        
+        // مدير النظام يرى جميع الروابط
+        if (user.department === 'management') {
+            menuItems += `
+                <li><a href="admin.html">الإدارة</a></li>
+                <li><a href="operations.html">العمليات</a></li>
+                <li><a href="technical.html">القسم الفني</a></li>
+                <li><a href="commercial.html" class="active">القسم التجاري</a></li>
+                <li><a href="fuel.html">قسم الوقود</a></li>
+            `;
+        } else {
+            // الموظفون الآخرون يرون فقط روابط أقسامهم
+            if (user.department === 'operations') {
+                menuItems += '<li><a href="operations.html">العمليات</a></li>';
+            } else if (user.department === 'technical') {
+                menuItems += '<li><a href="technical.html">القسم الفني</a></li>';
+            } else if (user.department === 'commercial') {
+                menuItems += '<li><a href="commercial.html" class="active">القسم التجاري</a></li>';
+            } else if (user.department === 'fuel') {
+                menuItems += '<li><a href="fuel.html">قسم الوقود</a></li>';
+            }
+        }
+        
+        sidebarMenu.innerHTML = menuItems;
+    }
+    </script>
+</body>
+</html>

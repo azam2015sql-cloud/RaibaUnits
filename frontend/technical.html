@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>القسم الفني - UnitFlow</title>
+    <link rel="stylesheet" href="styles.css" />
+    <script src="db.js" defer></script>
+    <script src="auth.js" defer></script>
+    <style>
+        .technical-container { padding: 20px; }
+        .technical-actions { display: flex; gap: 1rem; margin: 1.5rem 0; flex-wrap: wrap; }
+        .action-btn { padding: 0.75rem 1.5rem; background: #20c997; color: white; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; transition: all 0.3s ease; }
+        .action-btn:hover { background: #19a97c; transform: translateY(-2px); }
+        .subsections-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 1.5rem; margin-top: 1.5rem; }
+        .subsection { background: white; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.08); overflow: hidden; }
+        .subsection-header { padding: 1rem; background: #20c997; color: white; font-weight: bold; display: flex; justify-content: space-between; align-items: center; }
+        .subsection-header span { background: rgba(255,255,255,0.2); padding: 2px 8px; border-radius: 10px; font-size: 0.9em; }
+        .subsection-content { padding: 1rem; min-height: 200px; max-height: 300px; overflow-y: auto; }
+        .unit-card { background: #f8f9fa; border-radius: 5px; padding: 0.75rem; margin-bottom: 0.5rem; cursor: pointer; transition: all 0.2s ease; border-left: 4px solid #20c997; }
+        .unit-card:hover { background: #e9ecef; transform: translateX(-5px); }
+        .unit-id { font-weight: bold; margin-bottom: 0.25rem; }
+        .unit-details { display: flex; justify-content: space-between; font-size: 0.8rem; color: #6c757d; }
+        .unit-actions { display: flex; gap: 0.5rem; margin-top: 0.5rem; }
+        .unit-btn { padding: 0.25rem 0.5rem; border: none; border-radius: 3px; cursor: pointer; font-size: 0.7rem; }
+        .btn-move { background: #20c997; color: white; flex: 1; }
+        .btn-details { background: #6c757d; color: white; }
+        .btn-transfer { background: #4dabf7; color: white; }
+        .empty-subsection { text-align: center; padding: 2rem; color: #6c757d; font-style: italic; }
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); justify-content: center; align-items: center; z-index: 1000; }
+        .modal-content { background: white; border-radius: 8px; width: 90%; max-width: 500px; overflow: hidden; }
+        .modal-header { padding: 1rem; background: #20c997; color: white; font-weight: bold; }
+        .modal-body { padding: 1.5rem; }
+        .modal-footer { padding: 1rem; background: #f8f9fa; display: flex; justify-content: flex-end; gap: 1rem; }
+        .form-group { margin-bottom: 1rem; }
+        .form-group label { display: block; margin-bottom: 0.5rem; font-weight: bold; }
+        .form-group input, .form-group select { width: 100%; padding: 0.5rem; border: 1px solid #ced4da; border-radius: 4px; }
+        .btn { padding: 0.5rem 1rem; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; }
+        .btn-primary { background: #20c997; color: white; }
+        .btn-secondary { background: #6c757d; color: white; }
+    </style>
+</head>
+<body>
+    <div class="sidebar">
+        <div class="sidebar-header"><h2>UnitFlow</h2></div>
+        <ul class="sidebar-menu" id="sidebarMenu">
+            <li><a href="dashboard.html">لوحة التحكم</a></li>
+            <li><a href="technical.html" class="active">القسم الفني</a></li>
+        </ul>
+    </div>
+
+    <div class="main-content">
+        <div class="header"><h1>القسم الفني</h1><div class="user-info"><span id="userName">مرحباً</span><button class="logout-btn" onclick="logout()">تسجيل الخروج</button></div></div>
+        <p>إدارة عمليات الصيانة والإصلاح للوحدات.</p>
+
+        <div class="technical-actions">
+            <button class="action-btn" onclick="loadTechnicalData()">تحديث البيانات</button>
+        </div>
+
+        <div class="subsections-grid">
+            <div class="subsection">
+                <div class="subsection-header">انتظار الصيانة <span id="awaiting_maintenance_count">0</span></div>
+                <div class="subsection-content" id="awaiting_maintenance"></div>
+            </div>
+            <div class="subsection">
+                <div class="subsection-header">قيد الصيانة <span id="in_maintenance_count">0</span></div>
+                <div class="subsection-content" id="in_maintenance"></div>
+            </div>
+             <div class="subsection">
+                <div class="subsection-header">انتظار اسبير <span id="awaiting_spare_parts_count">0</span></div>
+                <div class="subsection-content" id="awaiting_spare_parts"></div>
+            </div>
+            <div class="subsection">
+                <div class="subsection-header">اكتمال الصيانة <span id="maintenance_completed_count">0</span></div>
+                <div class="subsection-content" id="maintenance_completed"></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal" id="moveUnitModal">
+        <div class="modal-content">
+            <div class="modal-header"><h3>نقل الوحدة</h3></div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label for="unitId">رقم الوحدة:</label>
+                    <input type="text" id="unitId" readonly>
+                </div>
+                <div class="form-group">
+                    <label for="targetSection">الحالة الهدف:</label>
+                    <select id="targetSection">
+                        <option value="awaiting_maintenance">انتظار الصيانة</option>
+                        <option value="in_maintenance">قيد الصيانة</option>
+                        <option value="awaiting_spare_parts">انتظار اسبير</option>
+                        <option value="maintenance_completed">اكتمال الصيانة</option>
+                    </select>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="hideMoveModal()">إلغاء</button>
+                <button class="btn btn-primary" onclick="confirmMove()">تأكيد النقل</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+    document.addEventListener('DOMContentLoaded', function () {
+        if (!requireAuth('index.html')) return;
+        
+        // التحقق من صلاحيات الوصول
+        if (!checkPageAccess(['technical', 'management'], ['technical.html'])) return;
+        
+        ensureAuthUI('userName');
+        updateSidebarMenu();
+        loadTechnicalData();
+    });
+    
+    async function loadTechnicalData() {
+        const units = await db.getUnits();
+        const technicalUnits = getUnitsForDepartment(units, 'technical');
+        
+        renderUnitsInSection('awaiting_maintenance', technicalUnits.filter(u => u.current_section === 'awaiting_maintenance'));
+        renderUnitsInSection('in_maintenance', technicalUnits.filter(u => u.current_section === 'in_maintenance'));
+        renderUnitsInSection('awaiting_spare_parts', technicalUnits.filter(u => u.current_section === 'awaiting_spare_parts'));
+        renderUnitsInSection('maintenance_completed', technicalUnits.filter(u => u.current_section === 'maintenance_completed'), true); 
+    }
+    
+    function renderUnitsInSection(sectionId, units, isFinalSection = false) {
+        const sectionElement = document.getElementById(sectionId);
+        const countElement = document.getElementById(`${sectionId}_count`);
+        sectionElement.innerHTML = '';
+        if(countElement) countElement.textContent = units.length;
+        
+        if (units.length === 0) {
+            sectionElement.innerHTML = '<div class="empty-subsection">لا توجد وحدات في هذا القسم</div>';
+            return;
+        }
+        
+        units.forEach(unit => {
+            const unitCard = document.createElement('div');
+            unitCard.className = 'unit-card';
+            
+            const actionsHtml = isFinalSection
+                ? `<button class="unit-btn btn-transfer" onclick="returnToOperations('${unit.id}')">عودة إلى العمليات</button>`
+                : `<button class="unit-btn btn-move" onclick="showMoveModal('${unit.id}', '${unit.current_section}')">نقل</button>`;
+
+            unitCard.innerHTML = `
+                <div class="unit-id">${unit.id}</div>
+                <div class="unit-details">
+                    <span>${unit.type}</span>
+                    <span>${formatDate(unit.last_movement_time)}</span>
+                </div>
+                <div class="unit-actions">
+                    ${actionsHtml}
+                    <button class="unit-btn btn-details" onclick="showUnitDetails('${unit.id}')">تفاصيل</button>
+                </div>
+            `;
+            
+            sectionElement.appendChild(unitCard);
+        });
+    }
+    
+    function showMoveModal(unitId, currentSection) {
+        document.getElementById('unitId').value = unitId;
+        const targetSelect = document.getElementById('targetSection');
+        for (let i = 0; i < targetSelect.options.length; i++) {
+            targetSelect.options[i].style.display = (targetSelect.options[i].value === currentSection) ? 'none' : 'block';
+        }
+        targetSelect.value = '';
+        document.getElementById('moveUnitModal').style.display = 'flex';
+    }
+    
+    function hideMoveModal() {
+        document.getElementById('moveUnitModal').style.display = 'none';
+    }
+    
+    async function confirmMove() {
+        const unitId = document.getElementById('unitId').value;
+        const targetSection = document.getElementById('targetSection').value;
+        if (!targetSection) {
+            alert('يرجى اختيار الحالة الهدف.');
+            return;
+        }
+        
+        const user = getLoggedUser();
+        if (!user) return;
+        
+        const success = await db.moveUnit(unitId, 'technical', targetSection, user.id, 'نقل في القسم الفني');
+        
+        if (success) {
+            hideMoveModal();
+            loadTechnicalData();
+        }
+    }
+    
+    async function returnToOperations(unitId) {
+        const user = getLoggedUser();
+        if (!user) return;
+        
+        if (confirm('هل تريد إرجاع هذه الوحدة إلى قسم العمليات؟')) {
+            const success = await db.moveUnit(unitId, 'operations', 'ready_for_loading', user.id, 'عودة إلى العمليات');
+            
+            if (success) {
+                alert('تم إرجاع الوحدة إلى العمليات بنجاح');
+                loadTechnicalData();
+            }
+        }
+    }
+    
+    async function showUnitDetails(unitId) {
+        const units = await db.getUnits();
+        const unit = units.find(u => u.id === unitId);
+        if (unit) {
+            alert(`تفاصيل الوحدة:\n\nرقم الوحدة: ${unit.id}\nالنوع: ${unit.type}\nالقسم: ${unit.current_department}\nالحالة: ${unit.current_section}\nآخر تحديث: ${formatDate(unit.last_movement_time)}`);
+        }
+    }
+    
+    function formatDate(dateString) {
+        if (!dateString) return '';
+        return new Date(dateString).toLocaleString('en-US', {
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit'
+        });
+    }
+    
+    function updateSidebarMenu() {
+        const user = getLoggedUser();
+        if (!user) return;
+        
+        const sidebarMenu = document.getElementById('sidebarMenu');
+        if (!sidebarMenu) return;
+        
+        let menuItems = '<li><a href="dashboard.html">لوحة التحكم</a></li>';
+        
+        // مدير النظام يرى جميع الروابط
+        if (user.department === 'management') {
+            menuItems += `
+                <li><a href="admin.html">الإدارة</a></li>
+                <li><a href="operations.html">العمليات</a></li>
+                <li><a href="technical.html" class="active">القسم الفني</a></li>
+                <li><a href="commercial.html">القسم التجاري</a></li>
+                <li><a href="fuel.html">قسم الوقود</a></li>
+            `;
+        } else {
+            // الموظفون الآخرون يرون فقط روابط أقسامهم
+            if (user.department === 'operations') {
+                menuItems += '<li><a href="operations.html">العمليات</a></li>';
+            } else if (user.department === 'technical') {
+                menuItems += '<li><a href="technical.html" class="active">القسم الفني</a></li>';
+            } else if (user.department === 'commercial') {
+                menuItems += '<li><a href="commercial.html">القسم التجاري</a></li>';
+            } else if (user.department === 'fuel') {
+                menuItems += '<li><a href="fuel.html">قسم الوقود</a></li>';
+            }
+        }
+        
+        sidebarMenu.innerHTML = menuItems;
+    }
+    </script>
+</body>
+</html>
