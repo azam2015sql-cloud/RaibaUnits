@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <title>لوحة الإدارة - UnitFlow</title>
     <link rel="stylesheet" href="styles.css" />
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <style>
         .admin-container { padding: 20px; max-width: 1000px; margin: 0 auto; }
         .admin-section { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 10px rgba(0,0,0,0.08); }
@@ -17,8 +16,6 @@
         .btn-primary { background: #4dabf7; color: white; }
         .btn-primary:hover { background: #339af0; }
         .btn-secondary { background: #6c757d; color: white; }
-        .btn-success { background: #28a745; color: white; }
-        .btn-success:hover { background: #218838; }
         .btn-danger { background: #dc3545; color: white; }
         .btn-sm { padding: 5px 10px; font-size: 14px; }
         table { width: 100%; border-collapse: collapse; margin-top: 15px; }
@@ -45,7 +42,7 @@
 <body>
     <div class="sidebar">
         <div class="sidebar-header"><h2>UnitFlow</h2></div>
-        <ul class="sidebar-menu" id="sidebarMenu">
+        <ul class="sidebar-menu">
             <li><a href="dashboard.html">لوحة التحكم</a></li>
             <li><a href="admin.html" class="active">الإدارة</a></li>
         </ul>
@@ -113,7 +110,6 @@
                 <div class="report-actions">
                     <button class="btn btn-primary" onclick="generateReport()">استخراج التقرير</button>
                     <button class="btn btn-secondary" onclick="printReport()">طباعة</button>
-                    <button class="btn btn-success" onclick="exportToExcel()">تصدير Excel</button>
                 </div>
                 <div id="reportResults"></div>
             </div>
@@ -163,12 +159,7 @@
     <script>
     document.addEventListener('DOMContentLoaded', () => {
         if (!requireAuth('index.html')) return; 
-        
-        // التحقق من صلاحيات الوصول - فقط مدير النظام
-        if (!checkPageAccess(['management'], ['admin.html'])) return;
-        
         ensureAuthUI('userName');
-        updateSidebarMenu();
         initializeAdminPanel();
     });
 
@@ -376,14 +367,7 @@
         } else {
             movements.forEach(m => {
                 tableHtml += `<tr>
-                    <td>${new Date(m.timestamp).toLocaleString('en-US', {
-                        year: 'numeric',
-                        month: '2-digit',
-                        day: '2-digit',
-                        hour: '2-digit',
-                        minute: '2-digit',
-                        second: '2-digit'
-                    })}</td><td>${m.unit_id}</td>
+                    <td>${new Date(m.timestamp).toLocaleString('ar-SA')}</td><td>${m.unit_id}</td>
                     <td>${m.employee_name}</td><td>${m.movement_type}</td>
                     <td>${m.from_department || ''} - ${m.from_section || ''}</td>
                     <td>${m.to_department || ''} - ${m.to_section || ''}</td>
@@ -395,78 +379,6 @@
 
     function printReport() {
         window.print();
-    }
-    
-    function updateSidebarMenu() {
-        const user = getLoggedUser();
-        if (!user) return;
-        
-        const sidebarMenu = document.getElementById('sidebarMenu');
-        if (!sidebarMenu) return;
-        
-        let menuItems = '<li><a href="dashboard.html">لوحة التحكم</a></li>';
-        
-        // مدير النظام يرى جميع الروابط
-        if (user.department === 'management') {
-            menuItems += `
-                <li><a href="admin.html" class="active">الإدارة</a></li>
-                <li><a href="operations.html">العمليات</a></li>
-                <li><a href="technical.html">القسم الفني</a></li>
-                <li><a href="commercial.html">القسم التجاري</a></li>
-                <li><a href="fuel.html">قسم الوقود</a></li>
-            `;
-        } else {
-            // الموظفون الآخرون يرون فقط روابط أقسامهم
-            if (user.department === 'operations') {
-                menuItems += '<li><a href="operations.html">العمليات</a></li>';
-            } else if (user.department === 'technical') {
-                menuItems += '<li><a href="technical.html">القسم الفني</a></li>';
-            } else if (user.department === 'commercial') {
-                menuItems += '<li><a href="commercial.html">القسم التجاري</a></li>';
-            } else if (user.department === 'fuel') {
-                menuItems += '<li><a href="fuel.html">قسم الوقود</a></li>';
-            }
-        }
-        
-        sidebarMenu.innerHTML = menuItems;
-    }
-    
-    // دالة تصدير التقرير إلى Excel
-    function exportToExcel() {
-        const reportResults = document.getElementById('reportResults');
-        const table = reportResults.querySelector('table');
-        
-        if (!table) {
-            alert('لا يوجد تقرير لعرضه. يرجى استخراج التقرير أولاً.');
-            return;
-        }
-        
-        try {
-            // إنشاء مصنف Excel
-            const wb = XLSX.utils.book_new();
-            
-            // تحويل الجدول إلى ورقة عمل
-            const ws = XLSX.utils.table_to_sheet(table);
-            
-            // إضافة ورقة العمل إلى المصنف
-            XLSX.utils.book_append_sheet(wb, ws, 'تقرير الحركات');
-            
-            // إنشاء اسم الملف مع التاريخ والوقت
-            const now = new Date();
-            const dateStr = now.toLocaleDateString('ar-SA').replace(/\//g, '-');
-            const timeStr = now.toLocaleTimeString('ar-SA', { hour12: false }).replace(/:/g, '-');
-            const fileName = `تقرير_الحركات_${dateStr}_${timeStr}.xlsx`;
-            
-            // تحميل الملف
-            XLSX.writeFile(wb, fileName);
-            
-            // رسالة نجاح
-            alert('تم تصدير التقرير إلى Excel بنجاح!');
-            
-        } catch (error) {
-            console.error('خطأ في تصدير Excel:', error);
-            alert('حدث خطأ في تصدير التقرير إلى Excel. يرجى المحاولة مرة أخرى.');
-        }
     }
     </script>
 </body>
