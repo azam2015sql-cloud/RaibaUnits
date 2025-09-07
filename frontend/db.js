@@ -1,4 +1,4 @@
-const API_URL = 'http://localhost:3000/api';
+const API_URL = '/api';
 
 /**
  * دالة مساعدة لمعالجة استجابات fetch
@@ -124,13 +124,5 @@ const db = {
             const response = await fetch(`${API_URL}/stats`);
             return await handleResponse(response);
         } catch (error) { console.error('Error fetching stats:', error.message); return {}; }
-    },
-
-    // --- الإحصائيات الشاملة ---
-    async getComprehensiveStats() {
-        try {
-            const response = await fetch(`${API_URL}/stats/comprehensive`);
-            return await handleResponse(response);
-        } catch (error) { console.error('Error fetching comprehensive stats:', error.message); return {}; }
     }
 };
