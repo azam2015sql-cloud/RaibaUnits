@@ -5,18 +5,54 @@
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <title>لوحة التحكم - UnitFlow</title>
     <link rel="stylesheet" href="styles.css" />
+    <style>
+        .nav-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-top: 20px;
+        }
+        .nav-card {
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.06);
+            text-align: center;
+            transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+        }
+        .nav-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 24px rgba(0,0,0,0.1);
+        }
+        .nav-card h2 {
+            margin-top: 0;
+            color: #333;
+        }
+        .nav-card p {
+            color: #666;
+            font-size: 14px;
+        }
+        .nav-card a {
+            display: block;
+            margin-top: 15px;
+            padding: 10px;
+            background-color: #4dabf7;
+            color: white;
+            border-radius: 6px;
+            font-weight: bold;
+        }
+    </style>
 </head>
-<body class="dashboard">
+<body>
     <div class="sidebar">
         <div class="sidebar-header"><h2>UnitFlow</h2></div>
-        <ul class="sidebar-menu" id="sidebarMenu">
+        <ul class="sidebar-menu">
             <li><a href="dashboard.html" class="active">لوحة التحكم</a></li>
             </ul>
     </div>
 
     <div class="main-content">
         <div class="header">
-            <button class="mobile-menu-toggle" onclick="toggleSidebar()">☰</button>
             <h1>لوحة التحكم الرئيسية</h1>
             <div class="user-info">
                 <span id="userName">مرحباً</span>
@@ -24,11 +60,7 @@
             </div>
         </div>
 
-        <div class="content">
         <div class="stats-container" id="statsContainer">
-            </div>
-
-            <div class="comprehensive-stats" id="comprehensiveStats">
             </div>
 
         <div class="nav-grid">
@@ -57,43 +89,17 @@
                 <p>إدارة ومتابعة تزويد الوحدات بالوقود.</p>
                 <a href="fuel.html">الانتقال إلى قسم الوقود</a>
             </div>
-            </div>
         </div>
     </div>
 
     <script src="auth.js"></script>
     <script src="db.js"></script>
     <script>
-        // Mobile menu toggle function
-        function toggleSidebar() {
-            const sidebar = document.querySelector('.sidebar');
-            sidebar.classList.toggle('open');
-        }
-        
-        // Close sidebar when clicking outside on mobile
-        document.addEventListener('click', (e) => {
-            const sidebar = document.querySelector('.sidebar');
-            const toggle = document.querySelector('.mobile-menu-toggle');
-            
-            if (window.innerWidth <= 768 && 
-                !sidebar.contains(e.target) && 
-                !toggle.contains(e.target) && 
-                sidebar.classList.contains('open')) {
-                sidebar.classList.remove('open');
-            }
-        });
-    </script>
-    <script>
         document.addEventListener('DOMContentLoaded', async () => {
             if (!requireAuth('index.html')) return;
-            
-            // التحقق من صلاحيات الوصول - جميع الموظفين يمكنهم الوصول للوحة التحكم
-            if (!checkPageAccess(['operations', 'technical', 'commercial', 'fuel', 'management'], ['dashboard.html'])) return;
-            
             ensureAuthUI('userName');
-            updateSidebarMenu();
             
-            // Load basic stats
+            // Load stats
             try {
                 const stats = await db.getStats();
                 const container = document.getElementById('statsContainer');
@@ -118,254 +124,7 @@
             } catch (error) {
                 console.error("Failed to load stats:", error);
             }
-            
-            // Load comprehensive stats
-            try {
-                const comprehensiveStats = await db.getComprehensiveStats();
-                loadComprehensiveStats(comprehensiveStats);
-            } catch (error) {
-                console.error("Failed to load comprehensive stats:", error);
-            }
         });
-        
-        function loadComprehensiveStats(stats) {
-            const container = document.getElementById('comprehensiveStats');
-            
-            // إنشاء نظرة عامة على الإحصائيات
-            const overviewHtml = createStatsOverview(stats);
-            
-            // إنشاء الإحصائيات التفصيلية
-            const detailedHtml = createDetailedStats(stats);
-            
-            container.innerHTML = overviewHtml + detailedHtml;
-        }
-        
-        function createStatsOverview(stats) {
-            const departments = [
-                {
-                    title: 'قسم العمليات',
-                    className: 'operations',
-                    icon: 'ع',
-                    data: stats.operations,
-                    sections: ['readyForLoading', 'underLoading', 'inTransitLoaded', 'underUnloading', 'inTransitEmpty', 'delivered']
-                },
-                {
-                    title: 'القسم الفني',
-                    className: 'technical',
-                    icon: 'ف',
-                    data: stats.technical,
-                    sections: ['awaitingMaintenance', 'inMaintenance', 'awaitingSpareParts', 'maintenanceCompleted']
-                },
-                {
-                    title: 'القسم التجاري',
-                    className: 'commercial',
-                    icon: 'ت',
-                    data: stats.commercial,
-                    sections: ['awaitingDocuments', 'documentProcessing', 'documentCompleted']
-                },
-                {
-                    title: 'قسم الوقود',
-                    className: 'fuel',
-                    icon: 'و',
-                    data: stats.fuel,
-                    sections: ['awaitingRefuel', 'refuelInProgress', 'refuelCompleted']
-                }
-            ];
-            
-            let overviewHtml = '<div class="stats-overview">';
-            
-            departments.forEach(dept => {
-                const total = dept.sections.reduce((sum, section) => sum + (dept.data[section] || 0), 0);
-                const breakdown = getDepartmentBreakdown(stats.unitTypeStats, dept.sections);
-                
-                overviewHtml += `
-                    <div class="stats-overview-item ${dept.className}">
-                        <div class="stats-overview-header">
-                            <div class="stats-overview-title">
-                                <div class="stats-overview-icon">${dept.icon}</div>
-                                ${dept.title}
-                            </div>
-                        </div>
-                        <div class="stats-overview-total">${total}</div>
-                        <div class="stats-overview-breakdown">
-                            ${breakdown}
-                        </div>
-                    </div>
-                `;
-            });
-            
-            overviewHtml += '</div>';
-            return overviewHtml;
-        }
-        
-        function createDetailedStats(stats) {
-            const sections = [
-                {
-                    title: 'قسم العمليات',
-                    className: 'operations',
-                    data: stats.operations,
-                    items: [
-                        { key: 'readyForLoading', label: 'جاهز للتحميل' },
-                        { key: 'underLoading', label: 'قيد التحميل' },
-                        { key: 'inTransitLoaded', label: 'في الطريق (محمل)' },
-                        { key: 'underUnloading', label: 'قيد التفريغ' },
-                        { key: 'inTransitEmpty', label: 'في الطريق (فارغ)' },
-                        { key: 'delivered', label: 'تم التسليم' }
-                    ]
-                },
-                {
-                    title: 'القسم الفني',
-                    className: 'technical',
-                    data: stats.technical,
-                    items: [
-                        { key: 'awaitingMaintenance', label: 'انتظار الصيانة' },
-                        { key: 'inMaintenance', label: 'قيد الصيانة' },
-                        { key: 'awaitingSpareParts', label: 'انتظار اسبير' },
-                        { key: 'maintenanceCompleted', label: 'اكتمال الصيانة' }
-                    ]
-                },
-                {
-                    title: 'القسم التجاري',
-                    className: 'commercial',
-                    data: stats.commercial,
-                    items: [
-                        { key: 'awaitingDocuments', label: 'في انتظار المستندات' },
-                        { key: 'documentProcessing', label: 'قيد المعالجة' },
-                        { key: 'documentCompleted', label: 'اكتمال المستندات' }
-                    ]
-                },
-                {
-                    title: 'قسم الوقود',
-                    className: 'fuel',
-                    data: stats.fuel,
-                    items: [
-                        { key: 'awaitingRefuel', label: 'في انتظار التزويد' },
-                        { key: 'refuelInProgress', label: 'قيد التزويد' },
-                        { key: 'refuelCompleted', label: 'تم التزويد' }
-                    ]
-                }
-            ];
-            
-            let detailedHtml = '<div class="detailed-stats">';
-            
-            sections.forEach(section => {
-                const total = section.items.reduce((sum, item) => sum + (section.data[item.key] || 0), 0);
-                
-                detailedHtml += `
-                    <div class="stats-section ${section.className}">
-                        <div class="stats-section-header">
-                            <span>${section.title}</span>
-                            <span class="stats-section-count">${total}</span>
-                        </div>
-                        <div class="stats-grid">
-                `;
-                
-                section.items.forEach(item => {
-                    const value = section.data[item.key] || 0;
-                    // تحويل camelCase إلى snake_case للبحث في قاعدة البيانات
-                    const dbSection = item.key.replace(/([A-Z])/g, '_$1').toLowerCase();
-                    const breakdown = getUnitTypeBreakdown(stats.unitTypeStats, dbSection);
-                    
-                    detailedHtml += `
-                        <div class="stat-item">
-                            <div class="stat-item-title">${item.label}</div>
-                            <div class="stat-item-value">${value}</div>
-                            <div class="stat-item-breakdown">
-                                ${breakdown}
-                            </div>
-                        </div>
-                    `;
-                });
-                
-                detailedHtml += `
-                        </div>
-                    </div>
-                `;
-            });
-            
-            detailedHtml += '</div>';
-            return detailedHtml;
-        }
-        
-        function getUnitTypeBreakdown(unitTypeStats, section) {
-            const types = ['Tipper', 'Cargo', 'Tanker', 'Silo'];
-            const typeLabels = { 'Tipper': 'T', 'Cargo': 'C', 'Tanker': 'Tk', 'Silo': 'S' };
-            
-            let breakdown = '';
-            
-            types.forEach(type => {
-                const count = unitTypeStats[section] && unitTypeStats[section][type] ? unitTypeStats[section][type] : 0;
-                breakdown += `
-                    <div class="stat-breakdown-item">
-                        <div class="stat-breakdown-label">${typeLabels[type]}</div>
-                        <div class="stat-breakdown-value">${count}</div>
-                    </div>
-                `;
-            });
-            
-            return breakdown;
-        }
-        
-        function getDepartmentBreakdown(unitTypeStats, sections) {
-            const types = ['Tipper', 'Cargo', 'Tanker', 'Silo'];
-            const typeLabels = { 'Tipper': 'T', 'Cargo': 'C', 'Tanker': 'Tk', 'Silo': 'S' };
-            
-            let breakdown = '';
-            
-            types.forEach(type => {
-                let totalCount = 0;
-                sections.forEach(section => {
-                    // تحويل camelCase إلى snake_case للبحث في قاعدة البيانات
-                    const dbSection = section.replace(/([A-Z])/g, '_$1').toLowerCase();
-                    const count = unitTypeStats[dbSection] && unitTypeStats[dbSection][type] ? unitTypeStats[dbSection][type] : 0;
-                    totalCount += count;
-                });
-                
-                breakdown += `
-                    <div class="breakdown-item">
-                        <div class="breakdown-type">${typeLabels[type]}</div>
-                        <div class="breakdown-count">${totalCount}</div>
-                        <div class="breakdown-indicator ${type.toLowerCase()}"></div>
-                    </div>
-                `;
-            });
-            
-            return breakdown;
-        }
-        
-        function updateSidebarMenu() {
-            const user = getLoggedUser();
-            if (!user) return;
-            
-            const sidebarMenu = document.getElementById('sidebarMenu');
-            if (!sidebarMenu) return;
-            
-            let menuItems = '<li><a href="dashboard.html" class="active">لوحة التحكم</a></li>';
-            
-            // مدير النظام يرى جميع الروابط
-            if (user.department === 'management') {
-                menuItems += `
-                    <li><a href="admin.html">الإدارة</a></li>
-                    <li><a href="operations.html">العمليات</a></li>
-                    <li><a href="technical.html">القسم الفني</a></li>
-                    <li><a href="commercial.html">القسم التجاري</a></li>
-                    <li><a href="fuel.html">قسم الوقود</a></li>
-                `;
-            } else {
-                // الموظفون الآخرون يرون فقط روابط أقسامهم
-                if (user.department === 'operations') {
-                    menuItems += '<li><a href="operations.html">العمليات</a></li>';
-                } else if (user.department === 'technical') {
-                    menuItems += '<li><a href="technical.html">القسم الفني</a></li>';
-                } else if (user.department === 'commercial') {
-                    menuItems += '<li><a href="commercial.html">القسم التجاري</a></li>';
-                } else if (user.department === 'fuel') {
-                    menuItems += '<li><a href="fuel.html">قسم الوقود</a></li>';
-                }
-            }
-            
-            sidebarMenu.innerHTML = menuItems;
-        }
     </script>
 </body>
 </html>
